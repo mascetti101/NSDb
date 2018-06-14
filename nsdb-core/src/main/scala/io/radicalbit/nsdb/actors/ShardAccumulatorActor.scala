@@ -24,14 +24,12 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.util.Timeout
 import io.radicalbit.nsdb.actors.ShardAccumulatorActor.Refresh
 import io.radicalbit.nsdb.actors.ShardPerformerActor.PerformShardWrites
-import io.radicalbit.nsdb.index.{FacetIndex, TimeSeriesIndex}
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events._
 import io.radicalbit.nsdb.statement.StatementParser
 import io.radicalbit.nsdb.statement.StatementParser._
 import org.apache.commons.io.FileUtils
 import org.apache.lucene.index.IndexWriter
-import org.apache.lucene.store.MMapDirectory
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._

@@ -24,6 +24,7 @@ import akka.cluster.ddata._
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import io.radicalbit.nsdb.cluster.index.Location
+import io.radicalbit.nsdb.protocol.AskTimeouts
 
 import scala.concurrent.duration._
 
@@ -86,11 +87,12 @@ class ReplicatedMetadataCache extends Actor with ActorLogging {
   private def metricDataKey(metricKey: MetricKey): LWWMapKey[MetricKey, Seq[Location]] =
     LWWMapKey("metric-cache-" + math.abs(metricKey.hashCode) % 100)
 
-  private val writeDuration = 5.seconds
+  implicit val timeout: Timeout = AskTimeouts.replicatedMetadataCacheTimeout
 
-  implicit val timeout: Timeout = Timeout(
-    context.system.settings.config.getDuration("nsdb.write-coordinator.timeout", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
+  //FIXME : make this value dependent on cluster number of nodes, ideally this must be something like :  (node_number/2 +1) * factor
+  private val writeDuration: FiniteDuration =
+    FiniteDuration((timeout.duration.length.toDouble / 100 * 80).toLong, TimeUnit.SECONDS)
+
   import context.dispatcher
 
   def receive: Receive = {

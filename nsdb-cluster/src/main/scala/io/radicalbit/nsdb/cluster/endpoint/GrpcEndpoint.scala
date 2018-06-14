@@ -16,17 +16,15 @@
 
 package io.radicalbit.nsdb.cluster.endpoint
 
-import java.util.concurrent.TimeUnit
-
 import akka.actor.{ActorRef, ActorSystem}
 import akka.pattern.ask
-import akka.util.Timeout
 import io.radicalbit.nsdb.client.rpc.GRPCServer
 import io.radicalbit.nsdb.cluster.coordinator.WriteCoordinator.{CreateDump, DumpCreated, Restore, Restored}
 import io.radicalbit.nsdb.common.JSerializable
 import io.radicalbit.nsdb.common.exception.InvalidStatementException
 import io.radicalbit.nsdb.common.protocol.{Bit, MetricField}
 import io.radicalbit.nsdb.common.statement._
+import io.radicalbit.nsdb.protocol.AskTimeouts
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events._
 import io.radicalbit.nsdb.rpc.common.{Dimension, Bit => GrpcBit}
@@ -64,8 +62,6 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
 
   private val log = LoggerFactory.getLogger(classOf[GrpcEndpoint])
 
-  implicit val timeout: Timeout =
-    Timeout(system.settings.config.getDuration("nsdb.rpc-endpoint.timeout", TimeUnit.SECONDS), TimeUnit.SECONDS)
   implicit val sys = system.dispatcher
 
   log.info("Starting GrpcEndpoint")
@@ -99,7 +95,7 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
   protected[this] object GrpcEndpointServiceDump extends Dump {
     override def createDump(request: DumpRequest): Future[DumpResponse] = {
       log.debug(s"Sending to WriteCoordinator dump request for: ${request.targets.mkString(",")}")
-      (writeCoordinator ? CreateDump(request.destPath, request.targets)).map {
+      (writeCoordinator ? CreateDump(request.destPath, request.targets))(AskTimeouts.readTimeout).map {
         case DumpCreated(inputPath) => DumpResponse(startedSuccessfully = true, dumpPath = inputPath)
         case msg =>
           log.error("got {} from dump request", msg)
@@ -108,7 +104,7 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
     }
 
     override def restore(request: RestoreRequest): Future[RestoreResponse] = {
-      (writeCoordinator ? Restore(request.sourcePath)).map {
+      (writeCoordinator ? Restore(request.sourcePath))(AskTimeouts.writeTimeout).map {
         case Restored(path) => RestoreResponse(startedSuccessfully = true, path)
         case msg =>
           log.error("got {} from restore request", msg)
@@ -128,7 +124,7 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
     ): Future[GrpcMetricsGot] = {
       //TODO: add failure handling
       log.debug("Received command ShowMetrics for namespace {}", request.namespace)
-      (readCoordinator ? GetMetrics(request.db, request.namespace)).mapTo[MetricsGot].map {
+      readCoordinator.?(GetMetrics(request.db, request.namespace))(AskTimeouts.readTimeout).mapTo[MetricsGot].map {
         case MetricsGot(db, namespace, metrics) =>
           GrpcMetricsGot(db, namespace, metrics.toList, completedSuccessfully = true)
       }
@@ -139,7 +135,8 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
     ): Future[GrpcMetricSchemaRetrieved] = {
       //TODO: add failure handling
       log.debug("Received command DescribeMetric for metric {}", request.metric)
-      (readCoordinator ? GetSchema(db = request.db, namespace = request.namespace, metric = request.metric))
+      readCoordinator
+        .?(GetSchema(db = request.db, namespace = request.namespace, metric = request.metric))(AskTimeouts.readTimeout)
         .map {
           case SchemaGot(db, namespace, metric, schema) =>
             val fields = schema
@@ -164,7 +161,8 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
         request: ShowNamespaces
     ): Future[Namespaces] = {
       log.debug("Received command ShowNamespaces for db: {}", request.db)
-      (readCoordinator ? GetNamespaces(db = request.db))
+      readCoordinator
+        .?(GetNamespaces(db = request.db))(AskTimeouts.readTimeout)
         .mapTo[NamespacesGot]
         .map { namespaces =>
           Namespaces(db = namespaces.db, namespaces = namespaces.namespaces.toSeq, completedSuccessfully = true)
@@ -193,19 +191,20 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
         value = valueFor(request.value)
       )
 
-      val res = (writeCoordinator ? MapInput(
-        db = request.database,
-        namespace = request.namespace,
-        metric = request.metric,
-        ts = request.timestamp,
-        record = bit
-      )).map {
-        case _: InputMapped =>
-          RPCInsertResult(completedSuccessfully = true)
-        case msg: RecordRejected =>
-          RPCInsertResult(completedSuccessfully = false, errors = msg.reasons.mkString(","))
-        case _ => RPCInsertResult(completedSuccessfully = false, errors = "unknown reason")
-      } recover {
+      val res = writeCoordinator
+        .?(
+          MapInput(db = request.database,
+                   namespace = request.namespace,
+                   metric = request.metric,
+                   ts = request.timestamp,
+                   record = bit))(AskTimeouts.writeTimeout)
+        .map {
+          case _: InputMapped =>
+            RPCInsertResult(completedSuccessfully = true)
+          case msg: RecordRejected =>
+            RPCInsertResult(completedSuccessfully = false, errors = msg.reasons.mkString(","))
+          case _ => RPCInsertResult(completedSuccessfully = false, errors = "unknown reason")
+        } recover {
         case t =>
           log.error(s"error while inserting $bit", t)
           RPCInsertResult(completedSuccessfully = false, t.getMessage)
@@ -271,7 +270,8 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
           statement match {
             case select: SelectSQLStatement =>
               log.debug("Received a select request {}", select)
-              (readCoordinator ? ExecuteStatement(select))
+              readCoordinator
+                .?(ExecuteStatement(select))(AskTimeouts.readTimeout)
                 .map {
                   // SelectExecution Success
                   case SelectStatementExecuted(db, namespace, metric, values: Seq[Bit]) =>
@@ -314,13 +314,15 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
                 .map {
                   case (db, namespace, metric, ts, dimensions, value) =>
                     val timestamp = ts getOrElse System.currentTimeMillis
-                    writeCoordinator ? MapInput(timestamp,
-                                                db,
-                                                namespace,
-                                                metric,
-                                                Bit(timestamp = timestamp,
-                                                    value = value,
-                                                    dimensions = dimensions.map(_.fields).getOrElse(Map.empty)))
+                    writeCoordinator.?(
+                      MapInput(
+                        timestamp,
+                        db,
+                        namespace,
+                        metric,
+                        Bit(timestamp = timestamp,
+                            value = value,
+                            dimensions = dimensions.map(_.fields).getOrElse(Map.empty))))(AskTimeouts.writeTimeout)
                 }
                 .getOrElse(Future(throw new InvalidStatementException("The insert SQL statement is invalid.")))
               result
@@ -346,7 +348,8 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
                 }
 
             case delete: DeleteSQLStatement =>
-              (writeCoordinator ? ExecuteDeleteStatement(delete))
+              writeCoordinator
+                .?(ExecuteDeleteStatement(delete))(AskTimeouts.writeTimeout)
                 .mapTo[DeleteStatementExecuted]
                 .map(
                   x =>
@@ -367,7 +370,8 @@ class GrpcEndpoint(readCoordinator: ActorRef, writeCoordinator: ActorRef)(implic
                 }
 
             case _: DropSQLStatement =>
-              (writeCoordinator ? DropMetric(statement.db, statement.namespace, statement.metric))
+              writeCoordinator
+                .?(DropMetric(statement.db, statement.namespace, statement.metric))(AskTimeouts.writeTimeout)
                 .mapTo[MetricDropped]
                 .map(
                   x =>

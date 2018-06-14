@@ -17,7 +17,6 @@
 package io.radicalbit.nsdb.cluster.coordinator
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 import akka.actor._
 import akka.cluster.Cluster
@@ -29,6 +28,7 @@ import io.radicalbit.nsdb.cluster.actor.ReplicatedMetadataCache._
 import io.radicalbit.nsdb.cluster.coordinator.MetadataCoordinator.commands._
 import io.radicalbit.nsdb.cluster.coordinator.MetadataCoordinator.events._
 import io.radicalbit.nsdb.cluster.index.Location
+import io.radicalbit.nsdb.protocol.AskTimeouts
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -46,9 +46,7 @@ class MetadataCoordinator(cache: ActorRef) extends Actor with ActorLogging {
 
   val cluster = Cluster(context.system)
 
-  implicit val timeout: Timeout = Timeout(
-    context.system.settings.config.getDuration("nsdb.metadata-coordinator.timeout", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
+  implicit val timeout: Timeout = AskTimeouts.metadataTimeout
   import context.dispatcher
 
   lazy val sharding: Boolean          = context.system.settings.config.getBoolean("nsdb.sharding.enabled")

@@ -17,10 +17,8 @@
 package io.radicalbit.nsdb.actors
 
 import java.nio.file.Paths
-import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.util.Timeout
 import io.radicalbit.nsdb.actors.ShardAccumulatorActor.Refresh
 import io.radicalbit.nsdb.common.JSerializable
 import io.radicalbit.nsdb.common.exception.InvalidStatementException
@@ -41,7 +39,6 @@ import spire.math.Interval
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContextExecutor
-import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -74,16 +71,6 @@ class ShardReaderActor(val basePath: String, val db: String, val namespace: Stri
     * Actor responsible for the actual writes into indexes.
     */
   var performerActor: ActorRef = _
-
-  implicit val timeout: Timeout =
-    Timeout(context.system.settings.config.getDuration("nsdb.publisher.timeout", TimeUnit.SECONDS), TimeUnit.SECONDS)
-
-  /**
-    * Writes scheduler interval.
-    */
-  lazy val interval = FiniteDuration(
-    context.system.settings.config.getDuration("nsdb.write.scheduler.interval", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
 
   private def handleQueryResults(metric: String, out: Try[Seq[Bit]]) = {
     out.recoverWith {
@@ -174,7 +161,7 @@ class ShardReaderActor(val basePath: String, val db: String, val namespace: Stri
     * @param schema metric's schema.
     * @return a single sequence of results obtained from different shards.
     */
-  private def retrieveAndorderPlainResults(statement: SelectSQLStatement,
+  private def retrieveAndOrderPlainResults(statement: SelectSQLStatement,
                                            parsedStatement: ParsedSimpleQuery,
                                            indexes: Seq[(ShardKey, TimeSeriesIndex)],
                                            schema: Schema): Try[Seq[Bit]] = {
@@ -240,7 +227,7 @@ class ShardReaderActor(val basePath: String, val db: String, val namespace: Stri
                 filterShardsThroughTime(statement.condition.map(_.expression), shardsForMetric(statement.metric))
               else Seq((ShardKey(metric, 0, 0), getIndex(ShardKey(metric, 0, 0))))
 
-            val orderedResults = retrieveAndorderPlainResults(statement, parsedStatement, indexes, schema)
+            val orderedResults = retrieveAndOrderPlainResults(statement, parsedStatement, indexes, schema)
 
             if (fields.lengthCompare(1) == 0 && fields.head.count) {
               orderedResults.map(seq => {

@@ -17,7 +17,6 @@
 package io.radicalbit.nsdb.cluster.actor
 
 import java.nio.file.Paths
-import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import akka.pattern.{ask, pipe}
@@ -28,6 +27,7 @@ import io.radicalbit.nsdb.cluster.index.Location
 import io.radicalbit.nsdb.common.protocol.Bit
 import io.radicalbit.nsdb.common.statement.DeleteSQLStatement
 import io.radicalbit.nsdb.model.Schema
+import io.radicalbit.nsdb.protocol.AskTimeouts
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events._
 
@@ -74,9 +74,7 @@ class MetricsDataActor(val basePath: String) extends Actor with ActorLogging {
   private def getReader(db: String, namespace: String): Option[ActorRef] =
     context.child(s"shard_reader_${db}_$namespace")
 
-  implicit val timeout: Timeout = Timeout(
-    context.system.settings.config.getDuration("nsdb.namespace-data.timeout", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
+  implicit val timeout: Timeout = AskTimeouts.dataTimeout
 
   import context.dispatcher
 

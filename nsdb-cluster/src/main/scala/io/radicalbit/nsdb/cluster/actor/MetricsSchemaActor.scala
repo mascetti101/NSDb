@@ -16,12 +16,11 @@
 
 package io.radicalbit.nsdb.cluster.actor
 
-import java.util.concurrent.TimeUnit
-
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import io.radicalbit.nsdb.actors.SchemaActor
+import io.radicalbit.nsdb.protocol.AskTimeouts
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events._
 
@@ -44,9 +43,7 @@ class MetricsSchemaActor(val basePath: String) extends Actor with ActorLogging {
       }
     )
 
-  implicit val timeout: Timeout = Timeout(
-    context.system.settings.config.getDuration("nsdb.namespace-schema.timeout", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
+  implicit val namespaceSchemaTimeout: Timeout = AskTimeouts.schemaTimeout
   import context.dispatcher
 
   override def receive: Receive = {

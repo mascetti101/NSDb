@@ -17,7 +17,6 @@
 package io.radicalbit.nsdb.cluster.coordinator
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.ask
@@ -25,6 +24,7 @@ import akka.util.Timeout
 import io.radicalbit.nsdb.cluster.NsdbPerfLogger
 import io.radicalbit.nsdb.cluster.coordinator.ReadCoordinator.Commands.GetConnectedNodes
 import io.radicalbit.nsdb.cluster.coordinator.ReadCoordinator.Events.ConnectedNodesGot
+import io.radicalbit.nsdb.protocol.AskTimeouts
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events._
 import io.radicalbit.nsdb.util.PipeableFutureWithSideEffect._
@@ -42,9 +42,7 @@ class ReadCoordinator(metadataCoordinator: ActorRef, namespaceSchemaActor: Actor
     with ActorLogging
     with NsdbPerfLogger {
 
-  implicit val timeout: Timeout = Timeout(
-    context.system.settings.config.getDuration("nsdb.read-coordinatoor.timeout", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
+  implicit val timeout: Timeout = AskTimeouts.readTimeout
 
   lazy val sharding: Boolean          = context.system.settings.config.getBoolean("nsdb.sharding.enabled")
   lazy val shardingInterval: Duration = context.system.settings.config.getDuration("nsdb.sharding.interval")

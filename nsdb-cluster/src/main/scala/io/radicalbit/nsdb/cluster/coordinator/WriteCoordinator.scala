@@ -20,12 +20,10 @@ import java.io.File
 import java.nio.file.Paths
 import java.time.Duration
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.Cluster
 import akka.dispatch.ControlMessage
-import akka.util.Timeout
 import io.radicalbit.nsdb.cluster.NsdbPerfLogger
 import io.radicalbit.nsdb.cluster.actor.MetricsDataActor.{
   AddRecordToLocation,
@@ -45,6 +43,7 @@ import io.radicalbit.nsdb.common.protocol.Bit
 import io.radicalbit.nsdb.common.statement.DeleteSQLStatement
 import io.radicalbit.nsdb.index.TimeSeriesIndex
 import io.radicalbit.nsdb.model.Schema
+import io.radicalbit.nsdb.protocol.AskTimeouts
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events._
 import io.radicalbit.nsdb.rpc.dump.DumpTarget
@@ -93,9 +92,6 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
 
   import akka.pattern.ask
 
-  implicit val timeout: Timeout = Timeout(
-    context.system.settings.config.getDuration("nsdb.write-coordinator.timeout", TimeUnit.SECONDS),
-    TimeUnit.SECONDS)
   import context.dispatcher
 
   val commitLogEnabled: Boolean = context.system.settings.config.getBoolean("nsdb.commit-log.enabled")
@@ -115,7 +111,7 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
     */
   private def broadcastMessage(msg: Any) =
     Future
-      .sequence(namespaces.values.toSeq.map(actor => actor ? msg))
+      .sequence(namespaces.values.toSeq.map(actor => actor.?(msg)(AskTimeouts.dataTimeout)))
       .map(_.head)
 
   /**
@@ -132,11 +128,9 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
                              metric: String,
                              action: CommitLoggerAction): Future[CommitLogResponse] = {
     if (commitLogEnabled && commitLogCoordinator.isDefined)
-      (commitLogCoordinator.get ? WriteToCommitLog(db = db,
-                                                   namespace = namespace,
-                                                   metric = metric,
-                                                   ts = ts,
-                                                   action = action))
+      commitLogCoordinator.get
+        .?(WriteToCommitLog(db = db, namespace = namespace, metric = metric, ts = ts, action = action))(
+          AskTimeouts.commitLogTimeout)
         .mapTo[CommitLogResponse]
     else if (commitLogEnabled) {
       Future.successful(
@@ -153,7 +147,8 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
     * @param op code executed in case of success.
     */
   def updateSchema(db: String, namespace: String, metric: String, bit: Bit)(op: Schema => Future[Any]): Future[Any] = {
-    (metricsSchemaActor ? UpdateSchemaFromRecord(db, namespace, metric, bit))
+    metricsSchemaActor
+      .?(UpdateSchemaFromRecord(db, namespace, metric, bit))(AskTimeouts.schemaTimeout)
       .flatMap {
         case SchemaUpdated(_, _, _, schema) =>
           log.debug("Valid schema for the metric {} and the bit {}", metric, bit)
@@ -174,8 +169,8 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
     * @param op code executed in case of success.
     */
   def getMetadataLocation(db: String, namespace: String, metric: String, bit: Bit, ts: Long)(
-      op: Location => Future[Any]): Future[Any] =
-    (metadataCoordinator ? GetWriteLocation(db, namespace, metric, ts)).flatMap {
+      op: Location => Future[Any]): Future[Any] = {
+    metadataCoordinator.?(GetWriteLocation(db, namespace, metric, ts))(AskTimeouts.metadataTimeout).flatMap {
       case LocationGot(_, _, _, Some(loc)) =>
         log.debug(s"received location for metric $metric, $loc")
         op(loc)
@@ -183,6 +178,7 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
         log.error(s"no location found for bit $bit")
         Future(RecordRejected(db, namespace, metric, bit, List(s"no location found for bit $bit")))
     }
+  }
 
   /**
     * Enqueues the bit into an internal structure. The real write is performed afterwards.
@@ -195,7 +191,7 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
   def accumulateRecord(db: String, namespace: String, metric: String, bit: Bit, location: Location): Future[Any] =
     namespaces.get(location.node) match {
       case Some(actor) =>
-        (actor ? AddRecordToLocation(db, namespace, bit, location)).map {
+        actor.?(AddRecordToLocation(db, namespace, bit, location))(AskTimeouts.accumulatorTimeout).map {
           case r: RecordAdded      => InputMapped(db, namespace, metric, r.record)
           case msg: RecordRejected => msg
           case _ =>
@@ -235,9 +231,9 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
         .flatMap {
           case WriteToCommitLogSucceeded(_, _, _, _) =>
             if (namespaces.isEmpty) {
-              (metricsSchemaActor ? msg).map(_ => NamespaceDeleted(db, namespace))
+              metricsSchemaActor.?(msg)(AskTimeouts.schemaTimeout).map(_ => NamespaceDeleted(db, namespace))
             } else
-              (metricsSchemaActor ? msg).flatMap(_ => broadcastMessage(msg))
+              metricsSchemaActor.?(msg)(AskTimeouts.schemaTimeout).flatMap(_ => broadcastMessage(msg))
           case WriteToCommitLogFailed(_, _, _, _, reason) =>
             log.error(s"Failed to write to commit-log for: $msg with reason: $reason")
             context.system.terminate()
@@ -250,10 +246,11 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
             if (namespaces.isEmpty)
               Future(DeleteStatementExecuted(statement.db, statement.metric, statement.metric))
             else
-              (metricsSchemaActor ? GetSchema(statement.db, statement.namespace, statement.metric))
+              metricsSchemaActor
+                .?(GetSchema(statement.db, statement.namespace, statement.metric))(AskTimeouts.schemaTimeout)
                 .flatMap {
                   case SchemaGot(_, _, _, Some(schema)) =>
-                    (metadataCoordinator ? GetLocations(db, namespace, metric)).flatMap {
+                    metadataCoordinator.?(GetLocations(db, namespace, metric))(AskTimeouts.metadataTimeout).flatMap {
                       case LocationsGot(_, _, _, locations) if locations.isEmpty =>
                         Future(DeleteStatementExecuted(statement.db, statement.metric, statement.metric))
                       case LocationsGot(_, _, _, locations) =>
@@ -281,7 +278,8 @@ class WriteCoordinator(commitLogCoordinator: Option[ActorRef],
             if (namespaces.isEmpty)
               Future(MetricDropped(db, namespace, metric))
             else {
-              (metricsSchemaActor ? DeleteSchema(db, namespace, metric))
+              metricsSchemaActor
+                .?(DeleteSchema(db, namespace, metric))(AskTimeouts.schemaTimeout)
                 .mapTo[SchemaDeleted]
                 .flatMap(_ => broadcastMessage(msg))
             }
