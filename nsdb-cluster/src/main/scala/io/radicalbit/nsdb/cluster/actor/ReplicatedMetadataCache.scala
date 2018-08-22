@@ -23,7 +23,8 @@ import akka.cluster.Cluster
 import akka.cluster.ddata._
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
-import io.radicalbit.nsdb.cluster.index.{Location, MetricInfo}
+import io.radicalbit.nsdb.cluster.location.Location
+import io.radicalbit.nsdb.cluster.index.MetricInfo
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

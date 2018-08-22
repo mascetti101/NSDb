@@ -123,6 +123,10 @@ lazy val `nsdb-cluster` = project
   .settings(PublishSettings.dontPublish: _*)
   .enablePlugins(JavaServerAppPackaging, SbtNativePackager)
   .settings(libraryDependencies ++= Dependencies.Cluster.libraries)
+  .settings(coverageExcludedPackages := "io\\.radicalbit\\.nsdb\\.cluster\\.serialization.*")
+  .settings(PB.targets in Compile := Seq(
+    scalapb.gen() -> (sourceManaged in Compile).value
+  ))
   .settings(
     compile in MultiJvm := ((compile in MultiJvm) triggeredBy (compile in Test)).value,
     executeTests in Test := {

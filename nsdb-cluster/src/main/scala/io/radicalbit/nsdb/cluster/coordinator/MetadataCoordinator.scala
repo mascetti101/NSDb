@@ -29,7 +29,8 @@ import io.radicalbit.nsdb.cluster.actor.ReplicatedMetadataCache._
 import io.radicalbit.nsdb.cluster.coordinator.MetadataCoordinator.commands._
 import io.radicalbit.nsdb.cluster.coordinator.MetadataCoordinator.events._
 import io.radicalbit.nsdb.cluster.createNodeName
-import io.radicalbit.nsdb.cluster.index.{Location, MetricInfo}
+import io.radicalbit.nsdb.cluster.location.Location
+import io.radicalbit.nsdb.cluster.index.MetricInfo
 import io.radicalbit.nsdb.protocol.MessageProtocol.Events.WarmUpCompleted
 import io.radicalbit.nsdb.util.ActorPathLogging
 
@@ -162,7 +163,7 @@ class MetadataCoordinator(cache: ActorRef, mediator: ActorRef) extends ActorPath
 
                     performAddLocationIntoCache(db, namespace, locations).map {
                       case LocationsAdded(_, _, locations) => LocationsGot(db, namespace, metric, locations)
-                      case _ => GetWriteLocationsFailed(db, namespace, metric, timestamp)
+                      case _                               => GetWriteLocationsFailed(db, namespace, metric, timestamp)
                     }
                   }
               case s => Future(LocationsGot(db, namespace, metric, s))
@@ -182,7 +183,7 @@ class MetadataCoordinator(cache: ActorRef, mediator: ActorRef) extends ActorPath
 
                 performAddLocationIntoCache(db, namespace, locations).map {
                   case LocationsAdded(_, _, locations) => LocationsGot(db, namespace, metric, locations)
-                  case _ => GetWriteLocationsFailed(db, namespace, metric, timestamp)
+                  case _                               => GetWriteLocationsFailed(db, namespace, metric, timestamp)
                 }
               }
           case _ =>

@@ -20,6 +20,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.index.{IndexWriter, IndexWriterConfig}
 import org.apache.lucene.store.RAMDirectory
 import org.scalatest.{FlatSpec, Matchers, OneInstancePerTest}
+import io.radicalbit.nsdb.cluster.location.Location
 
 class LocationIndexTest extends FlatSpec with Matchers with OneInstancePerTest {
 

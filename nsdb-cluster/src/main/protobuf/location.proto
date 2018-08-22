@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package io.radicalbit.nsdb.cluster;
+
+message Location {
+    string metric = 1;
+    string node = 2;
+    int64 from = 3;
+    int64 to = 4;
+}

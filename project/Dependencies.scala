@@ -256,7 +256,9 @@ object Dependencies {
       logback.logback,
       scalatest.core % Test,
       akka.testkit   % Test,
-      akka.multiNode
+      akka.multiNode,
+      scalaPB.`runtime`,
+      scalaPB.`runtime-grpc`
     )
   }
 
