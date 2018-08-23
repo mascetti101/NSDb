@@ -26,8 +26,8 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import io.radicalbit.nsdb.actors.{MetricAccumulatorActor, MetricReaderActor, ShardKey}
 import io.radicalbit.nsdb.cluster.actor.MetricsDataActor._
-import io.radicalbit.nsdb.cluster.location.Location
-import io.radicalbit.nsdb.common.protocol.Bit
+import io.radicalbit.nsdb.common.bit.Bit
+import io.radicalbit.nsdb.common.location.Location
 import io.radicalbit.nsdb.common.statement.DeleteSQLStatement
 import io.radicalbit.nsdb.model.Schema
 import io.radicalbit.nsdb.protocol.MessageProtocol.Commands._

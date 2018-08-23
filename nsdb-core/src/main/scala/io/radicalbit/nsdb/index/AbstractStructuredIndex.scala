@@ -17,7 +17,8 @@
 package io.radicalbit.nsdb.index
 
 import io.radicalbit.nsdb.common.JSerializable
-import io.radicalbit.nsdb.common.protocol.{Bit, DimensionFieldType, FieldClassType, TagFieldType}
+import io.radicalbit.nsdb.common.bit.Bit
+import io.radicalbit.nsdb.common.protocol._
 import io.radicalbit.nsdb.index.lucene.Index
 import io.radicalbit.nsdb.model.Schema
 import io.radicalbit.nsdb.statement.StatementParser.SimpleField
@@ -31,7 +32,7 @@ import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Generic Time series index based on entries of class [[Bit]].
+  * Generic Time series index based on entries of class [[io.radicalbit.nsdb.common.bit.Bit]].
   */
 abstract class AbstractStructuredIndex extends Index[Bit] with TypeSupport {
 

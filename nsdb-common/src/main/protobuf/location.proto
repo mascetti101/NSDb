@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package io.radicalbit.nsdb.cluster;
+package io.radicalbit.nsdb.common;
 
 message Location {
     string metric = 1;

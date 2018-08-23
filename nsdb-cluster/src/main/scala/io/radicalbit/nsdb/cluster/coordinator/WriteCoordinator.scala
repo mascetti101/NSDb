@@ -43,7 +43,6 @@ import io.radicalbit.nsdb.cluster.location.Location
 import io.radicalbit.nsdb.cluster.util.FileUtils
 import io.radicalbit.nsdb.cluster.{NsdbPerfLogger, createNodeName}
 import io.radicalbit.nsdb.commit_log.CommitLogWriterActor._
-import io.radicalbit.nsdb.common.protocol.Bit
 import io.radicalbit.nsdb.common.statement.DeleteSQLStatement
 import io.radicalbit.nsdb.index.{SchemaIndex, TimeSeriesIndex}
 import io.radicalbit.nsdb.model.Schema

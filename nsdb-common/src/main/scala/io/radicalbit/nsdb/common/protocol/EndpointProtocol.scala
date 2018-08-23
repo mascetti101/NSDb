@@ -16,6 +16,7 @@
 
 package io.radicalbit.nsdb.common.protocol
 
+import io.radicalbit.nsdb.common.bit.Bit
 import io.radicalbit.nsdb.common.statement.{CommandStatement, SQLStatement}
 
 /**

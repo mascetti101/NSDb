@@ -20,7 +20,7 @@ import java.nio.file.Paths
 
 import com.typesafe.scalalogging.LazyLogging
 import io.radicalbit.nsdb.actors.ShardKey
-import io.radicalbit.nsdb.common.protocol.Bit
+import io.radicalbit.nsdb.common.bit.Bit
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.facet.taxonomy.directory.DirectoryTaxonomyWriter
 import org.apache.lucene.index.{IndexWriter, IndexWriterConfig, SimpleMergedSegmentWarmer}

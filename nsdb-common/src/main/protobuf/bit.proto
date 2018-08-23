@@ -1,6 +1,8 @@
 syntax = "proto3";
 
-package io.radicalbit.nsdb.cluster;
+import "scalapb/scalapb.proto";
+
+package io.radicalbit.nsdb.common;
 
 message Dimension {
     oneof value {
@@ -19,6 +21,8 @@ message Tag {
 }
 
 message Bit {
+    option (scalapb.message).extends = "io.radicalbit.nsdb.common.protocol.TimeSeriesRecord";
+
     int64 timestamp = 1;
     oneof value {
         double decimalValue = 2;

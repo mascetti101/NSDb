@@ -16,8 +16,8 @@
 
 package io.radicalbit.nsdb.index
 
+import io.radicalbit.nsdb.common.bit.Bit
 import io.radicalbit.nsdb.common.exception.TypeNotSupportedException
-import io.radicalbit.nsdb.common.protocol.Bit
 import io.radicalbit.nsdb.common.{JDouble, JLong, JSerializable}
 import io.radicalbit.nsdb.model.{RawField, TypedField}
 import org.apache.lucene.document.Field.Store

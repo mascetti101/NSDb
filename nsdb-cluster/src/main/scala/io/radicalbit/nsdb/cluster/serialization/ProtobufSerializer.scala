@@ -17,8 +17,8 @@
 package io.radicalbit.nsdb.cluster.serialization
 
 import akka.serialization.SerializerWithStringManifest
-import io.radicalbit.nsdb.cluster.bit.Bit
-import io.radicalbit.nsdb.cluster.location.Location
+import io.radicalbit.nsdb.common.bit.Bit
+import io.radicalbit.nsdb.common.location.Location
 
 class ProtobufSerializer extends SerializerWithStringManifest {
 

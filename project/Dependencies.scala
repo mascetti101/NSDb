@@ -232,7 +232,9 @@ object Dependencies {
   object Common {
     val libraries = Seq(
       scala_logging.scala_logging,
-      config.core
+      config.core,
+      scalaPB.`runtime`,
+      scalaPB.`runtime-grpc`
     )
   }
 

@@ -19,7 +19,7 @@ package io.radicalbit.nsdb.protocol
 import akka.actor.ActorRef
 import akka.dispatch.ControlMessage
 import io.radicalbit.nsdb.actors.ShardKey
-import io.radicalbit.nsdb.common.protocol.Bit
+import io.radicalbit.nsdb.common.bit.Bit
 import io.radicalbit.nsdb.common.statement.{DeleteSQLStatement, SelectSQLStatement}
 import io.radicalbit.nsdb.model.Schema
 

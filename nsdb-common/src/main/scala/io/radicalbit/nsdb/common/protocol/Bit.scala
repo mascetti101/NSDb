@@ -22,7 +22,7 @@ import io.radicalbit.nsdb.common.JSerializable
   * Trait that contains Long timestamp field.
   */
 trait TimeSeriesRecord {
-  val timestamp: Long
+  def timestamp: Long
 }
 
 /**
